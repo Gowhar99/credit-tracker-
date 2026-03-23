@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Credit Card Tracker</title>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+      min-height: 100vh;
+    }
+
+    /* Login */
+    #loginScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #6b46c1 0%, #2d3748 100%);
+    }
+
+    .login-box {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      max-width: 380px;
+      width: 90%;
+    }
+
+    .login-box .icon { font-size: 3rem; margin-bottom: 12px; }
+    .login-box h1 { font-size: 1.6rem; color: #6b46c1; margin-bottom: 8px; }
+    .login-box p { color: #718096; font-size: 0.95rem; margin-bottom: 32px; line-height: 1.5; }
+
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 20px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      background: white;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #2d3748;
+      transition: all 0.2s;
+    }
+
+    .btn-google:hover { background: #f7fafc; border-color: #cbd5e0; }
+    .btn-google img { width: 20px; height: 20px; }
+
+    /* App */
+    #app { display: none; }
+
+    header {
+      background: #6b46c1;
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .user-avatar { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); }
+    .user-name { font-size: 0.88rem; opacity: 0.9; }
+
+    .btn-signout {
+      padding: 6px 14px;
+      border: 1.5px solid rgba(255,255,255,0.5);
+      border-radius: 6px;
+      background: transparent;
+      color: white;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-signout:hover { background: rgba(255,255,255,0.15); }
+
+    .container { max-width: 1000px; margin: 28px auto; padding: 0 16px; }
+
+    /* Summary */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .card .label { font-size: 0.78rem; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card .amount { font-size: 1.7rem; font-weight: 700; margin-top: 6px; }
+    .card.red .amount { color: #e53e3e; }
+    .card.green .amount { color: #38a169; }
+    .card.purple .amount { color: #6b46c1; }
+    .card.orange .amount { color: #dd6b20; }
+
+    /* Add card form */
+    .form-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 24px;
+    }
+
+    .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #6b46c1; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.8rem; font-weight: 600; color: #4a5568; }
+
+    .form-group input,
+    .form-group select {
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.93rem;
+      outline: none;
+      font-family: inherit;
+      transition: border 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus { border-color: #6b46c1; }
+
+    .btn {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary { background: #6b46c1; color: white; }
+    .btn-primary:hover { background: #553c9a; }
+    .btn-sm { padding: 5px 12px; font-size: 0.78rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }
+    .btn-paid { background: #c6f6d5; color: #276749; }
+    .btn-paid:hover { background: #9ae6b4; }
+    .btn-pending { background: #fefcbf; color: #7b341e; }
+    .btn-pending:hover { background: #faf089; }
+    .btn-delete { background: #fed7d7; color: #c53030; }
+    .btn-delete:hover { background: #fc8181; }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .cc-card {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .cc-card-header {
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: white;
+    }
+
+    .cc-card-header .card-name { font-size: 1rem; font-weight: 700; }
+    .cc-card-header .card-last4 { font-size: 0.82rem; opacity: 0.85; }
+
+    .cc-card-body { padding: 16px 18px; }
+
+    /* Bill add form inside card */
+    .add-bill-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .add-bill-form input {
+      padding: 7px 10px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      outline: none;
+      font-family: inherit;
+      flex: 1;
+      min-width: 80px;
+    }
+
+    .add-bill-form input:focus { border-color: #6b46c1; }
+
+    .add-bill-form button {
+      padding: 7px 14px;
+      background: #6b46c1;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Bills list */
+    .bill-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f4f8;
+      gap: 8px;
+    }
+
+    .bill-item:last-child { border-bottom: none; }
+
+    .bill-info { flex: 1; }
+    .bill-amount { font-size: 1rem; font-weight: 700; }
+    .bill-due { font-size: 0.78rem; color: #718096; margin-top: 2px; }
+    .bill-due.overdue { color: #e53e3e; font-weight: 600; }
+    .bill-due.soon { color: #dd6b20; font-weight: 600; }
+
+    .bill-actions { display: flex; gap: 6px; align-items: center; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .status-paid { background: #c6f6d5; color: #276749; }
+    .status-pending { background: #fefcbf; color: #7b341e; }
+    .status-overdue { background: #fed7d7; color: #c53030; }
+
+    .no-bills { text-align: center; padding: 20px; color: #a0aec0; font-size: 0.88rem; }
+
+    .cc-card-footer {
+      padding: 12px 18px;
+      background: #f7fafc;
+      border-top: 1px solid #f0f4f8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cc-card-footer .total-label { font-size: 0.78rem; color: #718096; }
+    .cc-card-footer .total-amount { font-size: 1.1rem; font-weight: 700; color: #e53e3e; }
+    .cc-card-footer .total-pending { font-size: 0.82rem; color: #718096; }
+
+    .delete-card-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #cbd5e0;
+      font-size: 1rem;
+      padding: 4px;
+    }
+
+    .delete-card-btn:hover { color: #e53e3e; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+
+    .empty-state .big-icon { font-size: 3rem; margin-bottom: 12px; }
+
+    .saving-indicator {
+      position: fixed;
+      bottom: 20px; right: 20px;
+      background: #6b46c1;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    /* Card color themes */
+    .color-0 { background: linear-gradient(135deg, #6b46c1, #9f7aea); }
+    .color-1 { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+    .color-2 { background: linear-gradient(135deg, #276749, #48bb78); }
+    .color-3 { background: linear-gradient(135deg, #c05621, #ed8936); }
+    .color-4 { background: linear-gradient(135deg, #c53030, #fc8181); }
+    .color-5 { background: linear-gradient(135deg, #2c7a7b, #38b2ac); }
+    .color-6 { background: linear-gradient(135deg, #1a365d, #2b6cb0); }
+    .color-7 { background: linear-gradient(135deg, #744210, #d69e2e); }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="icon">💳</div>
+    <h1>Credit Card Tracker</h1>
+    <p>Track all your credit card bills, due dates, and payments in one place.</p>
+    <button class="btn-google" onclick="signInWithGoogle()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+      Continue with Google
+    </button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <header>
+    <div class="header-left"><span>💳</span> Credit Card Tracker</div>
+    <div class="header-right">
+      <img id="userAvatar" class="user-avatar" src="" alt="" />
+      <span id="userName" class="user-name"></span>
+      <button class="btn-signout" onclick="signOut()">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Summary -->
+    <div class="summary-grid">
+      <div class="card red">
+        <div class="label">Total Due</div>
+        <div class="amount" id="totalDue">AED 0</div>
+      </div>
+      <div class="card orange">
+        <div class="label">Pending Bills</div>
+        <div class="amount" id="totalPending">0</div>
+      </div>
+      <div class="card green">
+        <div class="label">Paid This Month</div>
+        <div class="amount" id="totalPaid">AED 0</div>
+      </div>
+      <div class="card purple">
+        <div class="label">Total Cards</div>
+        <div class="amount" id="totalCards">0</div>
+      </div>
+    </div>
+
+    <!-- Add Card Form -->
+    <div class="form-card">
+      <h2>+ Add New Credit Card</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Card Name / Bank</label>
+          <input type="text" id="cardName" placeholder="e.g. ADCB, Emirates NBD" />
+        </div>
+        <div class="form-group">
+          <label>Last 4 Digits (optional)</label>
+          <input type="text" id="cardLast4" placeholder="1234" maxlength="4" />
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="addCard()">Add Card</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards Grid -->
+    <div id="cardsGrid" class="cards-grid"></div>
+
+  </div>
+</div>
+
+<div class="saving-indicator" id="savingIndicator">Saving...</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCokuNwGwSu-YoDX5twBPiB9DV4o3tUHqM",
+    authDomain: "borrow-tracker-b4e9a.firebaseapp.com",
+    projectId: "borrow-tracker-b4e9a",
+    storageBucket: "borrow-tracker-b4e9a.firebasestorage.app",
+    messagingSenderId: "473896123110",
+    appId: "1:473896123110:web:c45d8286e17fd38309d927"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+
+  let cards = [];
+  let bills = {};
+  let currentUser = null;
+  let unsubCards = null;
+  let unsubBills = {};
+
+  // ---- Auth ----
+  function signInWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert('Sign in failed: ' + err.message));
+  }
+
+  function signOut() {
+    if (unsubCards) unsubCards();
+    Object.values(unsubBills).forEach(u => u());
+    auth.signOut();
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('userAvatar').src = user.photoURL || '';
+      document.getElementById('userName').textContent = user.displayName || user.email;
+      listenToCards();
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+    }
+  });
+
+  // ---- Firestore ----
+  function userCol(path) {
+    return db.collection('users').doc(currentUser.uid).collection(path);
+  }
+
+  function listenToCards() {
+    if (unsubCards) unsubCards();
+    unsubCards = userCol('cc_cards').orderBy('createdAt').onSnapshot(snap => {
+      cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Listen to bills for each card
+      cards.forEach(c => {
+        if (!unsubBills[c.id]) {
+          unsubBills[c.id] = userCol('cc_cards').doc(c.id).collection('bills')
+            .orderBy('dueDate').onSnapshot(bsnap => {
+              bills[c.id] = bsnap.docs.map(d => ({ id: d.id, ...d.data() }));
+              renderAll();
+            });
+        }
+      });
+      renderAll();
+    });
+  }
+
+  // ---- Add Card ----
+  async function addCard() {
+    const name  = document.getElementById('cardName').value.trim();
+    const last4 = document.getElementById('cardLast4').value.trim();
+    if (!name) return alert('Please enter a card name.');
+    showSaving();
+    await userCol('cc_cards').add({ name, last4, createdAt: Date.now() });
+    document.getElementById('cardName').value = '';
+    document.getElementById('cardLast4').value = '';
+    hideSaving();
+  }
+
+  // ---- Delete Card ----
+  async function deleteCard(cardId) {
+    if (!confirm('Delete this card and all its bills?')) return;
+    showSaving();
+    // Delete all bills first
+    const billsSnap = await userCol('cc_cards').doc(cardId).collection('bills').get();
+    const batch = db.batch();
+    billsSnap.docs.forEach(d => batch.delete(d.ref));
+    batch.delete(userCol('cc_cards').doc(cardId));
+    await batch.commit();
+    delete bills[cardId];
+    if (unsubBills[cardId]) { unsubBills[cardId](); delete unsubBills[cardId]; }
+    hideSaving();
+  }
+
+  // ---- Add Bill ----
+  async function addBill(cardId) {
+    const amountEl = document.getElementById('bill-amount-' + cardId);
+    const dateEl   = document.getElementById('bill-date-' + cardId);
+    const notesEl  = document.getElementById('bill-notes-' + cardId);
+    const amount   = parseFloat(amountEl.value);
+    const dueDate  = dateEl.value;
+    const notes    = notesEl ? notesEl.value.trim() : '';
+    if (!amount || amount <= 0) return alert('Enter a valid amount.');
+    if (!dueDate) return alert('Enter a due date.');
+    showSaving();
+    await userCol('cc_cards').doc(cardId).collection('bills').add({
+      amount, dueDate, notes, status: 'pending', createdAt: Date.now()
+    });
+    amountEl.value = '';
+    dateEl.value = '';
+    if (notesEl) notesEl.value = '';
+    hideSaving();
+  }
+
+  // ---- Toggle Bill Status ----
+  async function toggleBill(cardId, billId, currentStatus) {
+    const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+    showSaving();
+    await userCol('cc_cards').doc(cardId).collection('bills').doc(billId).update({ status: newStatus });
+    hideSaving();
+  }
+
+  // ---- Delete Bill ----
+  async function deleteBill(cardId, billId) {
+    if (!confirm('Delete this bill?')) return;
+    showSaving();
+    await userCol('cc_cards').doc(cardId).collection('bills').doc(billId).delete();
+    hideSaving();
+  }
+
+  // ---- Render ----
+  function renderAll() {
+    updateSummary();
+    renderCards();
+  }
+
+  function updateSummary() {
+    let totalDue = 0, pendingCount = 0, paidThisMonth = 0;
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear  = now.getFullYear();
+
+    Object.values(bills).forEach(cardBills => {
+      cardBills.forEach(b => {
+        if (b.status === 'pending') { totalDue += b.amount; pendingCount++; }
+        if (b.status === 'paid') {
+          const d = new Date(b.dueDate + 'T00:00:00');
+          if (d.getMonth() === thisMonth && d.getFullYear() === thisYear) paidThisMonth += b.amount;
+        }
+      });
+    });
+
+    document.getElementById('totalDue').textContent     = fmt(totalDue);
+    document.getElementById('totalPending').textContent = pendingCount;
+    document.getElementById('totalPaid').textContent    = fmt(paidThisMonth);
+    document.getElementById('totalCards').textContent   = cards.length;
+  }
+
+  function renderCards() {
+    const grid = document.getElementById('cardsGrid');
+    if (cards.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="big-icon">💳</div>
+        <div>No cards yet. Add your first credit card above!</div>
+      </div>`;
+      return;
+    }
+
+    grid.innerHTML = cards.map((c, i) => {
+      const cardBills = (bills[c.id] || []).slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      const pending = cardBills.filter(b => b.status === 'pending').reduce((s, b) => s + b.amount, 0);
+      const colorClass = 'color-' + (i % 8);
+
+      const billsHtml = cardBills.length === 0
+        ? `<div class="no-bills">No bills added yet</div>`
+        : cardBills.map(b => {
+            const dueInfo = getDueInfo(b.dueDate, b.status);
+            return `
+              <div class="bill-item">
+                <div class="bill-info">
+                  <div class="bill-amount">${fmt(b.amount)}</div>
+                  <div class="bill-due ${dueInfo.cls}">Due: ${fmtDate(b.dueDate)} ${dueInfo.label}</div>
+                  ${b.notes ? `<div style="font-size:0.75rem;color:#a0aec0">${b.notes}</div>` : ''}
+                </div>
+                <div class="bill-actions">
+                  <span class="status-badge ${b.status === 'paid' ? 'status-paid' : dueInfo.overdue ? 'status-overdue' : 'status-pending'}">
+                    ${b.status === 'paid' ? '✓ Paid' : dueInfo.overdue ? 'Overdue' : 'Pending'}
+                  </span>
+                  <button class="btn-sm ${b.status === 'paid' ? 'btn-pending' : 'btn-paid'}" onclick="toggleBill('${c.id}','${b.id}','${b.status}')">
+                    ${b.status === 'paid' ? 'Undo' : 'Mark Paid'}
+                  </button>
+                  <button class="btn-sm btn-delete" onclick="deleteBill('${c.id}','${b.id}')">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+      return `
+        <div class="cc-card">
+          <div class="cc-card-header ${colorClass}">
+            <div>
+              <div class="card-name">${c.name}</div>
+              ${c.last4 ? `<div class="card-last4">•••• •••• •••• ${c.last4}</div>` : ''}
+            </div>
+            <button class="delete-card-btn" onclick="deleteCard('${c.id}')" title="Delete card">🗑️</button>
+          </div>
+          <div class="cc-card-body">
+            <div class="add-bill-form">
+              <input type="number" id="bill-amount-${c.id}" placeholder="Amount (AED)" min="1" />
+              <input type="date"   id="bill-date-${c.id}" />
+              <input type="text"   id="bill-notes-${c.id}" placeholder="Note (optional)" style="min-width:100px" />
+              <button onclick="addBill('${c.id}')">+ Add Bill</button>
+            </div>
+            ${billsHtml}
+          </div>
+          <div class="cc-card-footer">
+            <div>
+              <div class="total-label">Pending Amount</div>
+              <div class="total-amount">${fmt(pending)}</div>
+            </div>
+            <div class="total-pending">${cardBills.filter(b => b.status === 'pending').length} pending bill(s)</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function getDueInfo(dueDate, status) {
+    if (status === 'paid') return { cls: '', label: '', overdue: false };
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due   = new Date(dueDate + 'T00:00:00');
+    const diff  = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    if (diff < 0)  return { cls: 'overdue', label: `(${Math.abs(diff)}d overdue)`, overdue: true };
+    if (diff === 0) return { cls: 'soon',   label: '(Due Today!)', overdue: false };
+    if (diff <= 3)  return { cls: 'soon',   label: `(${diff}d left)`, overdue: false };
+    return { cls: '', label: `(${diff}d left)`, overdue: false };
+  }
+
+  function fmt(n) {
+    return 'AED ' + Number(n).toLocaleString('en-AE', { minimumFractionDigits: 0 });
+  }
+
+  function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function showSaving() { document.getElementById('savingIndicator').style.display = 'block'; }
+  function hideSaving()  { setTimeout(() => { document.getElementById('savingIndicator').style.display = 'none'; }, 600); }
+</script>
+</body>
+</html>
