@@ -810,11 +810,13 @@
     emailjs.init(p);
     try {
       setStatus('Sending test...', false);
+      const sampleDate = new Date(); sampleDate.setDate(sampleDate.getDate() + 5);
+      const sampleDateStr = sampleDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
       await emailjs.send(s, t, {
         to_email: email,
         to_name:  name,
-        subject:  '✅ Credit Card Tracker — Email Test',
-        message:  'Your email reminders are working correctly! You will receive alerts 5 days, 2 days, and on the due date of each pending bill.',
+        subject:  '⏰ 5-Day Reminder: ADCB Credit Card bill due in 5 days',
+        message:  `This is a reminder for your credit card bill:\n\n  Card:    ADCB Credit Card\n  Amount:  AED 1,500\n  Due:     ${sampleDateStr}\n  Status:  ⏰ Due in 5 day(s)\n\nPlease make your payment on time to avoid late fees.\n\n— Credit Card Tracker`,
       });
       setStatus('✅ Test email sent! Check your inbox.', true);
     } catch (err) {
