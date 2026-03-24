@@ -862,7 +862,7 @@
       await emailjs.send(s, t, {
         to_email: email,
         to_name:  name,
-        subject:  '⏰ 5-Day Reminder: ADCB Credit Card bill due in 5 days',
+        subject:  '⏰ Reminder: Credit Card bill due in 5 days',
         message:  `This is a reminder for your credit card bill:\n\n  Card:    ADCB Credit Card\n  Amount:  AED 1,500\n  Due:     ${sampleDateStr}\n  Status:  ⏰ Due in 5 day(s)\n\nPlease make your payment on time to avoid late fees.\n\n— Credit Card Tracker`,
       });
       setStatus('✅ Test email sent! Check your inbox.', true);
