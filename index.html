@@ -516,6 +516,7 @@
       document.getElementById('userName').textContent = user.displayName || user.email;
       listenToCards();
       loadEmailSettings();
+      requestNotificationPermission();
     } else {
       currentUser = null;
       document.getElementById('loginScreen').style.display = 'flex';
@@ -609,11 +610,57 @@
     hideSaving();
   }
 
+  // ---- Daily Browser Notification ----
+  function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function showDailyBillNotification() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const notifKey = 'cc_daily_notif_' + todayStr;
+    if (localStorage.getItem(notifKey)) return; // already shown today
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const upcoming = [];
+
+    cards.forEach(card => {
+      (bills[card.id] || []).forEach(bill => {
+        if (bill.status === 'paid') return;
+        const due  = new Date(bill.dueDate + 'T00:00:00');
+        const diff = Math.round((due - today) / 86400000);
+        if (diff >= 0 && diff <= 7) {
+          upcoming.push({ card: card.name, amount: bill.amount, diff, dueDate: bill.dueDate });
+        }
+      });
+    });
+
+    if (upcoming.length === 0) return;
+
+    upcoming.sort((a, b) => a.diff - b.diff);
+    const lines = upcoming.map(u =>
+      u.diff === 0
+        ? `⚠️ ${u.card}: AED ${Number(u.amount).toLocaleString()} DUE TODAY`
+        : `• ${u.card}: AED ${Number(u.amount).toLocaleString()} due in ${u.diff}d`
+    );
+
+    new Notification('💳 Credit Card Reminders', {
+      body: lines.join('\n'),
+      icon: 'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+    });
+
+    localStorage.setItem(notifKey, '1');
+  }
+
   // ---- Render ----
   function renderAll() {
     updateSummary();
     renderCards();
     checkAndSendEmailReminders();
+    showDailyBillNotification();
   }
 
   function updateSummary() {
