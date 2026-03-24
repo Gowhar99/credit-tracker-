@@ -610,6 +610,32 @@
     hideSaving();
   }
 
+  // ---- Edit Card ----
+  async function editCard(cardId, currentName, currentLast4) {
+    const name = prompt('Card name:', currentName);
+    if (name === null) return;
+    if (!name.trim()) return alert('Card name cannot be empty.');
+    const last4 = prompt('Last 4 digits (leave blank to remove):', currentLast4);
+    if (last4 === null) return;
+    showSaving();
+    await userCol('cc_cards').doc(cardId).update({ name: name.trim(), last4: last4.trim() });
+    hideSaving();
+  }
+
+  // ---- Edit Bill ----
+  async function editBill(cardId, billId, currentAmount, currentDueDate) {
+    const amount = prompt('Amount (AED):', currentAmount);
+    if (amount === null) return;
+    const parsed = parseFloat(amount);
+    if (!parsed || parsed <= 0) return alert('Enter a valid amount.');
+    const dueDate = prompt('Due date (YYYY-MM-DD):', currentDueDate);
+    if (dueDate === null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return alert('Use format YYYY-MM-DD (e.g. 2026-04-04)');
+    showSaving();
+    await userCol('cc_cards').doc(cardId).collection('bills').doc(billId).update({ amount: parsed, dueDate });
+    hideSaving();
+  }
+
   // ---- Daily Browser Notification ----
   function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -718,6 +744,7 @@
                   <button class="btn-sm ${b.status === 'paid' ? 'btn-pending' : 'btn-paid'}" onclick="toggleBill('${c.id}','${b.id}','${b.status}')">
                     ${b.status === 'paid' ? 'Undo' : 'Mark Paid'}
                   </button>
+                  <button class="btn-sm" style="background:#e9d8fd;color:#553c9a" onclick="editBill('${c.id}','${b.id}',${b.amount},'${b.dueDate}')">✏️</button>
                   <button class="btn-sm btn-delete" onclick="deleteBill('${c.id}','${b.id}')">✕</button>
                 </div>
               </div>
@@ -731,7 +758,10 @@
               <div class="card-name">${c.name}</div>
               ${c.last4 ? `<div class="card-last4">•••• •••• •••• ${c.last4}</div>` : ''}
             </div>
-            <button class="delete-card-btn" onclick="deleteCard('${c.id}')" title="Delete card">🗑️</button>
+            <div style="display:flex;gap:6px">
+              <button class="delete-card-btn" onclick="editCard('${c.id}','${c.name}','${c.last4||''}')" title="Edit card" style="font-size:0.85rem">✏️</button>
+              <button class="delete-card-btn" onclick="deleteCard('${c.id}')" title="Delete card">🗑️</button>
+            </div>
           </div>
           <div class="cc-card-body">
             <div class="add-bill-form">
