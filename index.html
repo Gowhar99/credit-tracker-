@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -291,6 +292,63 @@
 
     .delete-card-btn:hover { color: #e53e3e; }
 
+    /* Email settings banner */
+    #emailSetupBanner {
+      background: #faf5ff;
+      border: 1.5px solid #d6bcfa;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+
+    #emailSetupBanner .banner-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #6b46c1;
+      margin-bottom: 4px;
+    }
+
+    #emailSetupBanner .banner-sub {
+      font-size: 0.82rem;
+      color: #718096;
+      margin-bottom: 12px;
+    }
+
+    #emailSetupBanner .setup-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    #emailSetupBanner input {
+      padding: 8px 11px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    #emailSetupBanner input:focus { border-color: #6b46c1; }
+
+    #emailSetupBanner .setup-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .notif-status {
+      font-size: 0.82rem;
+      color: #718096;
+      margin-left: 4px;
+    }
+
+    .notif-status.ok { color: #276749; }
+    .notif-status.err { color: #c53030; }
+
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -351,6 +409,24 @@
   </header>
 
   <div class="container">
+
+    <!-- Email Notification Setup -->
+    <div id="emailSetupBanner">
+      <div class="banner-title">📧 Email Reminders Setup</div>
+      <div class="banner-sub">Get emails 5 days, 2 days, and on the due date of each pending bill. Powered by <strong>EmailJS</strong> (free). <a href="https://www.emailjs.com" target="_blank" style="color:#6b46c1">Create free account →</a></div>
+      <div class="setup-fields">
+        <input id="ejs-service"  placeholder="Service ID (e.g. service_abc123)" />
+        <input id="ejs-template" placeholder="Template ID (e.g. template_abc123)" />
+        <input id="ejs-pubkey"   placeholder="Public Key" />
+        <input id="ejs-email"    placeholder="Your email address" type="email" />
+      </div>
+      <div class="setup-actions">
+        <button class="btn btn-primary" style="font-size:0.85rem;padding:8px 18px" onclick="saveEmailSettings()">Save & Enable</button>
+        <button class="btn" style="font-size:0.85rem;padding:8px 18px;background:#e2e8f0;color:#2d3748" onclick="testEmail()">Send Test Email</button>
+        <button class="btn" style="font-size:0.85rem;padding:8px 18px;background:#fed7d7;color:#c53030" onclick="clearEmailSettings()">Disable</button>
+        <span id="notifStatus" class="notif-status"></span>
+      </div>
+    </div>
 
     <!-- Summary -->
     <div class="summary-grid">
@@ -439,6 +515,7 @@
       document.getElementById('userAvatar').src = user.photoURL || '';
       document.getElementById('userName').textContent = user.displayName || user.email;
       listenToCards();
+      loadEmailSettings();
     } else {
       currentUser = null;
       document.getElementById('loginScreen').style.display = 'flex';
@@ -536,6 +613,7 @@
   function renderAll() {
     updateSummary();
     renderCards();
+    checkAndSendEmailReminders();
   }
 
   function updateSummary() {
@@ -651,6 +729,155 @@
 
   function showSaving() { document.getElementById('savingIndicator').style.display = 'block'; }
   function hideSaving()  { setTimeout(() => { document.getElementById('savingIndicator').style.display = 'none'; }, 600); }
+
+  // ---- Email Notification Settings ----
+  const EJS_KEYS = { service: 'cc_ejs_service', template: 'cc_ejs_template', pubkey: 'cc_ejs_pubkey', email: 'cc_ejs_email' };
+  const EMAIL_SENT_KEY = 'cc_email_sent_log';
+
+  const DEFAULT_EJS = {
+    service:  'service_fwjdftd',
+    template: 'template_9g3w2lz',
+    pubkey:   'mYyqRyJGPtWuLJosQ',
+  };
+
+  function loadEmailSettings() {
+    document.getElementById('ejs-service').value  = localStorage.getItem(EJS_KEYS.service)  || DEFAULT_EJS.service;
+    document.getElementById('ejs-template').value = localStorage.getItem(EJS_KEYS.template) || DEFAULT_EJS.template;
+    document.getElementById('ejs-pubkey').value   = localStorage.getItem(EJS_KEYS.pubkey)   || DEFAULT_EJS.pubkey;
+    document.getElementById('ejs-email').value    = localStorage.getItem(EJS_KEYS.email)    || (currentUser ? currentUser.email : '');
+    updateEmailStatus();
+  }
+
+  function saveEmailSettings() {
+    const s = document.getElementById('ejs-service').value.trim();
+    const t = document.getElementById('ejs-template').value.trim();
+    const p = document.getElementById('ejs-pubkey').value.trim();
+    const e = document.getElementById('ejs-email').value.trim();
+    if (!s || !t || !p || !e) return setStatus('Please fill in all fields.', false);
+    localStorage.setItem(EJS_KEYS.service, s);
+    localStorage.setItem(EJS_KEYS.template, t);
+    localStorage.setItem(EJS_KEYS.pubkey, p);
+    localStorage.setItem(EJS_KEYS.email, e);
+    emailjs.init(p);
+    setStatus('✅ Email reminders enabled!', true);
+  }
+
+  function clearEmailSettings() {
+    Object.values(EJS_KEYS).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem(EMAIL_SENT_KEY);
+    ['ejs-service','ejs-template','ejs-pubkey','ejs-email'].forEach(id => document.getElementById(id).value = '');
+    setStatus('Disabled.', false);
+  }
+
+  function updateEmailStatus() {
+    const pubkey = localStorage.getItem(EJS_KEYS.pubkey) || DEFAULT_EJS.pubkey;
+    const configured = (localStorage.getItem(EJS_KEYS.service) || DEFAULT_EJS.service) &&
+                       (localStorage.getItem(EJS_KEYS.template) || DEFAULT_EJS.template) &&
+                       pubkey && localStorage.getItem(EJS_KEYS.email);
+    if (configured) {
+      emailjs.init(pubkey);
+      setStatus('✅ Email reminders active', true);
+    } else {
+      emailjs.init(DEFAULT_EJS.pubkey);
+    }
+  }
+
+  function setStatus(msg, ok) {
+    const el = document.getElementById('notifStatus');
+    el.textContent = msg;
+    el.className = 'notif-status ' + (ok ? 'ok' : 'err');
+  }
+
+  async function sendReminderEmail(toEmail, toName, subject, message) {
+    const serviceId  = localStorage.getItem(EJS_KEYS.service);
+    const templateId = localStorage.getItem(EJS_KEYS.template);
+    if (!serviceId || !templateId) return;
+    await emailjs.send(serviceId, templateId, {
+      to_email: toEmail,
+      to_name:  toName,
+      subject:  subject,
+      message:  message,
+    });
+  }
+
+  async function testEmail() {
+    const email = document.getElementById('ejs-email').value.trim() || (currentUser && currentUser.email);
+    const name  = currentUser ? (currentUser.displayName || 'User') : 'User';
+    const s = document.getElementById('ejs-service').value.trim();
+    const t = document.getElementById('ejs-template').value.trim();
+    const p = document.getElementById('ejs-pubkey').value.trim();
+    if (!s || !t || !p || !email) return setStatus('Fill in all fields first.', false);
+    emailjs.init(p);
+    try {
+      setStatus('Sending test...', false);
+      await emailjs.send(s, t, {
+        to_email: email,
+        to_name:  name,
+        subject:  '✅ Credit Card Tracker — Email Test',
+        message:  'Your email reminders are working correctly! You will receive alerts 5 days, 2 days, and on the due date of each pending bill.',
+      });
+      setStatus('✅ Test email sent! Check your inbox.', true);
+    } catch (err) {
+      setStatus('❌ Failed: ' + err.text, false);
+    }
+  }
+
+  // ---- Check & Send Due Reminders ----
+  function checkAndSendEmailReminders() {
+    if (!Object.values(EJS_KEYS).every(k => localStorage.getItem(k))) return;
+
+    const today    = new Date(); today.setHours(0,0,0,0);
+    const todayStr = today.toISOString().split('T')[0];
+    const sentLog  = JSON.parse(localStorage.getItem(EMAIL_SENT_KEY) || '{}');
+    const toEmail  = localStorage.getItem(EJS_KEYS.email);
+    const toName   = currentUser ? (currentUser.displayName || 'User') : 'User';
+
+    const reminders = [
+      { days: 5, label: '5-Day Reminder',  tag: '5d' },
+      { days: 2, label: '2-Day Reminder',  tag: '2d' },
+      { days: 0, label: 'Due Today!',      tag: '0d' },
+    ];
+
+    cards.forEach(card => {
+      (bills[card.id] || []).forEach(bill => {
+        if (bill.status === 'paid') return;
+
+        const due  = new Date(bill.dueDate + 'T00:00:00');
+        const diff = Math.round((due - today) / 86400000);
+
+        reminders.forEach(({ days, label, tag }) => {
+          if (diff !== days) return;
+
+          const key = `${bill.id}_${tag}_${todayStr}`;
+          if (sentLog[key]) return; // already sent today
+
+          const subject = `💳 ${label}: ${card.name}${card.last4 ? ' ••' + card.last4 : ''} bill due ${days === 0 ? 'TODAY' : 'in ' + days + ' days'}`;
+          const message = [
+            `Hi ${toName},`,
+            '',
+            `This is a reminder for your credit card bill:`,
+            '',
+            `  Card:    ${card.name}${card.last4 ? ' (ending ' + card.last4 + ')' : ''}`,
+            `  Amount:  AED ${Number(bill.amount).toLocaleString('en-AE')}`,
+            `  Due:     ${fmtDate(bill.dueDate)}`,
+            `  Status:  ${days === 0 ? '⚠️ DUE TODAY' : '⏰ Due in ' + days + ' day(s)'}`,
+            bill.notes ? `  Notes:   ${bill.notes}` : '',
+            '',
+            `Please make your payment on time to avoid late fees.`,
+            '',
+            '— Credit Card Tracker',
+          ].filter(l => l !== null).join('\n');
+
+          sendReminderEmail(toEmail, toName, subject, message)
+            .then(() => {
+              sentLog[key] = true;
+              localStorage.setItem(EMAIL_SENT_KEY, JSON.stringify(sentLog));
+            })
+            .catch(err => console.warn('Email send failed:', err));
+        });
+      });
+    });
+  }
 </script>
 </body>
 </html>
